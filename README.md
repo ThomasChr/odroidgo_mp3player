@@ -26,7 +26,7 @@ mkdir mp3player
 cd mp3player
 git clone https://github.com/ThomasChr/odroidgo_mp3player .
 git clone --recursive https://github.com/espressif/esp-idf.git
-sudo ./esp-idf/install.sh
+./esp-idf/install.sh
 . ./esp-idf/export.sh
 cd mp3player
 make clean
