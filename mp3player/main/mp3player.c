@@ -82,25 +82,33 @@ void mp3playermain()
 
     puts("Reading buffer");
     // read file in 64 KB Buffer, make sure Buffer is in internal RAM
-    int buffersize = 2 * 1024 * 1024;
+    //int buffersize = 64 * 1024;
     //char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_DMA);
-    char *soundfile = malloc(buffersize);
-    tone = fgetc(s);
-    int i = 0;
-    while (tone != EOF && i < buffersize) {
-        soundfile[i++] = tone;
+
+    // For now just use use external RAM
+    int buffersize = 2 * 1024 * 1024;
+    char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_SPIRAM);
+
+    if (soundfile) {
         tone = fgetc(s);
-    }
-
-    puts("Starting sound");
-    for (int i; i <= buffersize; i++) {
-        dac_output_voltage(dac_channel1, soundfile[i]);
-
-        // delay
-        int sleep = 0;
-        while (sleep <= 255) {
-            sleep++;
+        int i = 0;
+        while (tone != EOF && i < buffersize) {
+            soundfile[i++] = tone;
+            tone = fgetc(s);
         }
+
+        puts("Starting sound");
+        for (int i; i <= buffersize; i++) {
+            dac_output_voltage(dac_channel1, soundfile[i]);
+
+            // delay
+            int sleep = 0;
+            while (sleep <= 255) {
+                sleep++;
+            }
+        }
+    } else {
+        puts("Could not allocate buffer for sound");
     }
     puts("Sound done");
     /************ /SOUND ************/
