@@ -134,7 +134,8 @@ void mp3playermain()
 
 void app_main()
 {
-    // Stacksize is 8 KB (8192), Core is 1
+    // Stacksize is 8 KB (8192), our Core is 1 which is the APP CPU, which is completely free
+    // Core 0 (PRO CPU) is tasked by default with managment (WiFi, bluetooth...)
     xTaskCreatePinnedToCore(&mp3playermain, "mp3player_main", 8192, NULL, 5, NULL, 1);
 }
 
