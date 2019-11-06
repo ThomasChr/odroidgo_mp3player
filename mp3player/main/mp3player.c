@@ -3,13 +3,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
-#include "driver/dac.h"
 #include "sdkconfig.h"
 
 #include "odroid_display.h"
 #include "odroid_sdcard.h"
 
 #include "minimp3_ex.h"
+
+#include "driver/i2s.h"
 
 #define LED 2
 
@@ -57,24 +58,6 @@ void mp3playermain()
 
     /************ SOUND ************/
     puts("Preparing sound");
-    dac_channel_t dac_channel1 = DAC_CHANNEL_1;
-    dac_channel_t dac_channel2 = DAC_CHANNEL_2;
-    gpio_num_t dac_gpio1 = 25;
-    gpio_num_t dac_gpio2 = 26;
-
-    gpio_pad_select_gpio(dac_gpio1);
-    gpio_set_direction(dac_gpio1, GPIO_MODE_OUTPUT);
-    gpio_set_level(dac_gpio1, 1);
-
-    gpio_pad_select_gpio(dac_gpio2);
-    gpio_set_direction(dac_gpio2, GPIO_MODE_OUTPUT);
-    gpio_set_level(dac_gpio2, 1);
-
-    dac_output_enable(dac_channel1);
-    dac_output_enable(dac_channel2);
-
-    // differential DAC, we set DAC2 to 0 volt:
-    dac_output_voltage(dac_channel2, 0);
 
     // Created with audacity, raw wave file, mono, 8 bit, no header
     FILE* s = fopen("/sdcard/tetris.raw", "r");
@@ -82,12 +65,12 @@ void mp3playermain()
 
     puts("Reading buffer");
     // read file in 64 KB Buffer, make sure Buffer is in internal RAM
-    //int buffersize = 64 * 1024;
-    //char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_DMA);
+    int buffersize = 100 * 1024;
+    char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_DMA);
 
-    // For now just use use external RAM
-    int buffersize = 2 * 1024 * 1024;
-    char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_SPIRAM);
+    // For now just use use external RAM (512 KB)
+    //int buffersize = 512 * 1024;
+    //char *soundfile = heap_caps_malloc(buffersize, MALLOC_CAP_SPIRAM);
 
     if (soundfile) {
         tone = fgetc(s);
@@ -97,16 +80,27 @@ void mp3playermain()
             tone = fgetc(s);
         }
 
-        puts("Starting sound");
-        for (int i; i <= buffersize; i++) {
-            dac_output_voltage(dac_channel1, soundfile[i]);
+        int i2s_num = 0;
+	    i2s_config_t i2s_config = {
+            .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN ,
+            .sample_rate = 16000,
+            .bits_per_sample = 8,
+	        .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+	        .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+	        .intr_alloc_flags = 0,
+	        .dma_buf_count = 8,
+	        .dma_buf_len = 64,
+	        .use_apll = false,
+	    };
+	    //install and start i2s driver
+	    i2s_driver_install(i2s_num, &i2s_config, 0, NULL);
+	    //init DAC pad
+	    i2s_set_dac_mode(I2S_DAC_CHANNEL_BOTH_EN);
 
-            // delay
-            int sleep = 0;
-            while (sleep <= 255) {
-                sleep++;
-            }
-        }
+        i2s_set_clk(0, 44100, 16, 1);
+	size_t bytes_written;
+        i2s_write(0, soundfile, buffersize, &bytes_written, portMAX_DELAY);
+
     } else {
         puts("Could not allocate buffer for sound");
     }
